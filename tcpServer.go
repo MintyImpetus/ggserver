@@ -54,11 +54,11 @@ type entity struct {
 	y int
 }
 
-blockList := make(map[block]string)
-entityList := make(map[entity]string)
+var blockList map[string]block
+var entityList map[string]entity
 
-playerList := make(map[player]string)
-blockList := make(map[net.Conn]string)
+var playerList map[string]player
+var connList map[string]net.con
 
 func inRangeOfNumbers( query int, low int, high int) bool {
 	if (query >= low && query <= high) {
@@ -150,9 +150,9 @@ func updateClient(playerId int) string {
 }
 
 func handleConnections(connId int) {
+	// Change playerId to connId as they can be the same
 	var message string
-	playerId := genUUID()
-	playerList[playerId] = player{health: 20, x: 0, y: 1, renderDistance: 3}
+	playerList[connId] = player{health: 20, x: 0, y: 1, renderDistance: 3}
         for {
 		message = ""
                 data, err := bufio.NewReader(connList[connId]).ReadString('\n')
