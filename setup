@@ -1,0 +1,6 @@
+go get github.com/satori/go.uuid
+
+go env -w GO111MODULE=auto
+
+go mod init
+go mod tidy
