@@ -6,6 +6,8 @@ import (
         "net"
         "os"
         "strings"
+	"github.com/mattn/go-tty"
+	"log"
 )
 
 func main() {
@@ -22,15 +24,39 @@ func main() {
                 return
         }
 
+	tty, err := tty.Open()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer tty.Close()
+
         for {
-                reader := bufio.NewReader(os.Stdin)
-                fmt.Print(">> ")
-                text, _ := reader.ReadString('\n')
-                fmt.Fprintf(c, text+"\n")
+		text := ""
+		r, err := tty.ReadRune()
+		if err != nil {
+			log.Fatal(err)
+		}
+		if string(r) == "w" {
+			text = "move up"
+		}
+		if string(r) == "a" {
+			text = "move left"
+		}
+		if string(r) == "d" {
+			text = "move right"
+		}
+		if string(r) == "s" {
+			text = "move down"
+		}
+		if string(r) == "e" {
+			text = "exit"
+			tty.Close()
+		}
+                fmt.Fprintf(c, string(text)+"\n")
 
                 message, _ := bufio.NewReader(c).ReadString('\n')
                 fmt.Print("->: " + message)
-                if strings.TrimSpace(string(text)) == "exit" {
+                if strings.TrimSpace(string(r)) == "e" {
                         fmt.Println("TCP client exiting...")
                         return
                 }

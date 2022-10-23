@@ -41,27 +41,27 @@ type player struct {
 	health int
 	inventory []item
 	visibleActions []action
-	x int
-	y int
-	renderDistance int
+	x float64
+	y float64
+	renderDistance float64
 }
 
 type block struct {
 	blockType string
 	flickerUp bool
 	sinceLastFlicker int
-	x int
-	y int
-	width int
-	height int
+	x float64
+	y float64
+	width float64
+	height float64
 }
 
 type entity struct {
 	name string
 	id string
 	hp int
-	x int
-	y int
+	x float64
+	y float64
 }
 
 type action struct {
@@ -74,7 +74,9 @@ var entityList = make(map[string]entity)
 var playerList = make(map[string]player)
 var connList = make(map[string]net.Conn)
 
-func inRangeOfNumbers( query int, low int, high int) bool {
+var increment float64 = 0.01
+
+func inRangeOfNumbers( query float64, low float64, high float64) bool {
 	if (query >= low && query <= high) {
 		return true
 	} else {
@@ -90,12 +92,22 @@ func getDifference(a int, b int) int {
 	}
 }
 
+
+func getDifferenceFloat64(a float64, b float64) float64 {
+	if a > b {
+		return a - b
+	} else {
+		return b - a
+	}
+}
+
+
 func genUUID() string {
 	id := uuid.New()
 	return id.String()
 }
 
-func checkIfBlock(x int, y int) bool {
+func checkIfBlock(x float64, y float64) bool {
 	exists := false
 	for _, currentObject := range blockList {
 		if ( inRangeOfNumbers(x, currentObject.x, currentObject.x + currentObject.width) && inRangeOfNumbers(y, currentObject.y, currentObject.y + currentObject.height)) {
@@ -106,7 +118,7 @@ func checkIfBlock(x int, y int) bool {
 
 }
 
-func HandleMove(PlayerX int, PlayerY int, dArray []string) (int, int) {
+func HandleMove(PlayerX float64, PlayerY float64, dArray []string) (float64, float64) {
 	tmpX := PlayerX
 	tmpY := PlayerY
 	fmt.Println(PlayerX, PlayerY)
@@ -193,22 +205,25 @@ func updateClient(playerId string) string {
 	i := 0
 	for key, currentBlock := range blockList {
 		tempMessage = ""
-		for x := currentBlock.x; x <= currentBlock.x + currentBlock.width; x++ {
-			for y := currentBlock.y; y <= currentBlock.y + currentBlock.height; y++ {
-				//Make this into a function.
-				distanceX := getDifference(playerList[playerId].x, x)
-				distanceY := getDifference(playerList[playerId].y, y)
-				lineDistance := int(math.Sqrt(math.Pow(float64(distanceX), 2) + math.Pow(float64(distanceY), 2)))
+		for x := currentBlock.x; x <= currentBlock.x + currentBlock.width; x = x + increment {
+			for y := currentBlock.y; y <= currentBlock.y + currentBlock.height; y = y + increment  {
+				distanceX := getDifferenceFloat64(playerList[playerId].x, x)
+				distanceY := getDifferenceFloat64(playerList[playerId].y, y)
+				lineDistance := math.Sqrt(math.Pow(float64(distanceX), 2) + math.Pow(float64(distanceY), 2))
 				if lineDistance <= playerList[playerId].renderDistance {
 					if tempMessage != "" {
 						tempMessage = tempMessage + ", "
 					}
-					tempMessage = tempMessage + `{"x": ` + strconv.Itoa(x) + `, "y": ` + strconv.Itoa(y) + `}`
+					tempMessage = tempMessage + `{"x": ` + strconv.Itoa(int(x)) + `, "y": ` + strconv.Itoa(int(y)) + `}`
+					// It seems like the only way to make this work is to either create a queue for blocks that are visible that need to be sent, !!!or to add the , to the previous part, and not add it if it is the first one! 
+					//if y != currentBlock.y + currentBlock.height {
+					//}
 				}
 			}
 		}
 		if tempMessage != "" {
-			message = message + ` { "id": "` + key + ` ", "blockType": "` + currentBlock.blockType  + `", "x": ` + strconv.Itoa(currentBlock.x) + `, "y": ` + strconv.Itoa(currentBlock.y) + `, "width": ` + strconv.Itoa(currentBlock.width) + `, "height": ` + strconv.Itoa(currentBlock.height) + `, ` + `"blocks": [ ` + tempMessage + ` ] }`
+			// Each block needs to be surrounded by curly brackets, within square, eg [{x 5 y 6}, {x 6 y 7}]
+			message = message + ` { "id": "` + key + ` ", "blockType": "` + currentBlock.blockType  + `", "x": ` + strconv.Itoa(int(currentBlock.x)) + `, "y": ` + strconv.Itoa(int(currentBlock.y)) + `, "width": ` + strconv.Itoa(int(currentBlock.width)) + `, "height": ` + strconv.Itoa(int(currentBlock.height)) + `, ` + `"blocks": [ ` + tempMessage + ` ] }`
 			if i != len(blockList) - 1 {
 				message = message + ", "
 			}
