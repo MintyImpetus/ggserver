@@ -148,9 +148,16 @@ func HandleMove(PlayerX float64, PlayerY float64, dArray []string) (float64, flo
 	return tmpX, tmpY
 }
 
-func displayAnimation(name string, duration int) {
+func getObjectDistance(x float64, y float64) {
+	distanceX := getDifferenceFloat64(playerList[playerId].x, x)
+	distanceY := getDifferenceFloat64(playerList[playerId].y, y)
+	lineDistance := math.Sqrt(math.Pow(float64(distanceX), 2) + math.Pow(float64(distanceY), 2))
+
+}
+
+func displayAnimation(key string, name string, x float64, y float64, duration int) {
 	for key, currentPlayer := range playerList {
-		if getObjectDistance <= playerList[key] {
+		if getObjectDistance <= playerList[key].renderDistance {
 			currentPlayer.visibleActions = append(playerList[key].visibleActions, action{ name: name, duration: duration })			
 			playerList[key] = currentPlayer
 		}
@@ -187,7 +194,7 @@ func handleActions(connId string, dArray []string) string {
 		fmt.Println("PlayerX:", currentPlayer.x, "PlayerY:", currentPlayer.y)
 		fmt.Println("listX:", playerList[connId].x, "listY", playerList[connId].y)
 
-		response = response + `"x": ` + strconv.Itoa(currentPlayer.x) + `, "y": ` + strconv.Itoa(currentPlayer.y)
+		response = response + `"x": ` + strconv.Itoa(int(currentPlayer.x)) + `, "y": ` + strconv.Itoa(int(currentPlayer.y))
 	}
 
 	response = response + " } ] "
