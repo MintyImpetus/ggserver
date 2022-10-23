@@ -116,13 +116,14 @@ func HandleMove(PlayerX int, PlayerY int, dArray []string) (int, int) {
 	return tmpX, tmpY
 }
 
-func updateClient(playerId int) string {
+func updateClient(playerId string) string {
 	var tempMessage string
 	message := "["
-	for index, _ := range blockList {
+	i := 0
+	for key, currentBlock := range blockList {
 		tempMessage = ""
-		for x := blockList[index].x; x <= blockList[index].x + blockList[index].width; x++ {
-			for y := blockList[index].y; y <= blockList[index].y + blockList[index].height; y++ {
+		for x := currentBlock.x; x <= currentBlock.x + currentBlock.width; x++ {
+			for y := currentBlock.y; y <= currentBlock.y + currentBlock.height; y++ {
 				distanceX := getDifference(playerList[playerId].x, x)
 				distanceY := getDifference(playerList[playerId].y, y)
 				lineDistance := int(math.Sqrt(math.Pow(float64(distanceX), 2) + math.Pow(float64(distanceY), 2)))
@@ -132,27 +133,35 @@ func updateClient(playerId int) string {
 					}
 					tempMessage = tempMessage + `{"x": ` + strconv.Itoa(x) + `, "y": ` + strconv.Itoa(y) + `}`
 					// It seems like the only way to make this work is to either create a queue for blocks that are visible that need to be sent, !!!or to add the , to the previous part, and not add it if it is the first one! 
-					//if y != blockList[index].y + blockList[index].height {
+					//if y != currentBlock.y + currentBlock.height {
 					//}
 				}
 			}
 		}
 		if tempMessage != "" {
 			// Each block needs to be surrounded by curly brackets, within square, eg [{x 5 y 6}, {x 6 y 7}]
-			message = message + ` { "blockType": "` + blockList[index].blockType  + `", "x": ` + strconv.Itoa(blockList[index].x) + `, "y": ` + strconv.Itoa(blockList[index].y) + `, "width": ` + strconv.Itoa(blockList[index].width) + `, "height": ` + strconv.Itoa(blockList[index].height) + `, ` + `"blocks": [ ` + tempMessage + ` ] }`
-			if index != len(blockList) - 1 {
+			message = message + ` { "id": "` + key + ` ", "blockType": "` + currentBlock.blockType  + `", "x": ` + strconv.Itoa(currentBlock.x) + `, "y": ` + strconv.Itoa(currentBlock.y) + `, "width": ` + strconv.Itoa(currentBlock.width) + `, "height": ` + strconv.Itoa(currentBlock.height) + `, ` + `"blocks": [ ` + tempMessage + ` ] }`
+			if i != len(blockList) - 1 {
 				message = message + ", "
 			}
 		}
+		i = i + 1
 	}
 	message = message + " ]"
 	return message
 }
 
+<<<<<<< HEAD
 func handleConnections(connId int) {
 	// Change playerId to connId as they can be the same
 	var message string
 	playerList[connId] = player{health: 20, x: 0, y: 1, renderDistance: 3}
+=======
+func handleConnections(connId string) {
+	var message string
+	playerList[connId] = player{health: 20, x: 0, y: 1, renderDistance: 3}
+	currentPlayer := playerList[connId]
+>>>>>>> e433f36114d11a5f70ddb07826b26d112ff6025b
         for {
 		message = ""
                 data, err := bufio.NewReader(connList[connId]).ReadString('\n')
@@ -169,22 +178,24 @@ func handleConnections(connId int) {
 			message = strings.TrimSpace(string(dArray[1]))
                 }
 		if strings.TrimSpace(string(dArray[0])) == "health" {
-			message = (strconv.Itoa(playerList[playerId].health))
+			message = (strconv.Itoa(currentPlayer.health))
                 }
 		if strings.TrimSpace(string(dArray[0])) == "sethealth" {
 			var err error
-			playerList[playerId].health, err = strconv.Atoi(strings.TrimSpace(string(dArray[1])))
+			currentPlayer.health, err = strconv.Atoi(strings.TrimSpace(string(dArray[1])))
 			if err != nil {
 				fmt.Println(err)
 			}
 		}
 		if strings.TrimSpace(string(dArray[0])) == "move" {
-		playerList[playerId].x, playerList[playerId].y = HandleMove(playerList[playerId].x, playerList[playerId].y, dArray)
-		fmt.Println("PlayerX:", playerList[playerId].x, "PlayerY:", playerList[playerId].y)
+			currentPlayer.x, currentPlayer.y = HandleMove(currentPlayer.x, currentPlayer.y, dArray)
+			fmt.Println("PlayerX:", currentPlayer.x, "PlayerY:", currentPlayer.y)
 		}
 		if strings.TrimSpace(string(dArray[0])) == "update" {
-			message = updateClient(playerId)
+			message = updateClient(connId)
                 }
+		
+		playerList[connId] = currentPlayer
 
 		message = message + "\n"
                 connList[connId].Write([]byte(message))
@@ -193,20 +204,21 @@ func handleConnections(connId int) {
 
 func gameLoop() {
 	for {
-		for index, _ := range blockList {
-			if blockList[index].blockType == "flicker" {
-				if blockList[index].sinceLastFlicker >= 5 {
-				if blockList[index].flickerUp == true {
-						blockList[index].y = blockList[index].y - 1
-						blockList[index].flickerUp = false
+		for key, currentBlock := range blockList {
+			if currentBlock.blockType == "flicker" {
+				if currentBlock.sinceLastFlicker >= 5 {
+				if currentBlock.flickerUp == true {
+						currentBlock.y = currentBlock.y - 1
+						currentBlock.flickerUp = false
 					} else {
-						blockList[index].y = blockList[index].y + 1
-						blockList[index].flickerUp = true
+						currentBlock.y = currentBlock.y + 1
+						currentBlock.flickerUp = true
 					}
 				} else {
-					blockList[index].sinceLastFlicker = blockList[index].sinceLastFlicker + 1
+					currentBlock.sinceLastFlicker = currentBlock.sinceLastFlicker + 1
 				}
 			}
+			blockList[key] = currentBlock
 		}
 		time.Sleep(time.Second)
 	}
