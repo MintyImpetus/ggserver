@@ -1,8 +1,17 @@
 /*
+
 TODO:
-Must refactor code as the newly implemented uuid identity system no longer supports looping through slices.
 
 Complete the communication protocol and begin working on the client in pygame.
+	Make it so the message variable is repeatedly updated to include what a player within render distance does, and every time a player updates, send them the response to their previous action, all the actions of visible players and then all visible block data.
+
+
+
+Whenever action is done, run a goroutine function that adds the action to all nearby players list of actions. Have a goroutine running that constantly lowers the tick-till-end number for each of the actions and destroys them when done. 
+
+Whenever the client asks for an update, send them all the actions and how long 'till they end.
+
+At some point in the future, I could attempt to make all major tasks run through goroutines, as it may speed up the program.
 
 */
 
@@ -31,6 +40,7 @@ type item struct {
 type player struct {
 	health int
 	inventory []item
+	visibleActions []action
 	x int
 	y int
 	renderDistance int
@@ -52,6 +62,11 @@ type entity struct {
 	hp int
 	x int
 	y int
+}
+
+type action struct {
+	name string
+	duration int
 }
 
 var blockList = make(map[string]block)
@@ -94,16 +109,21 @@ func checkIfBlock(x int, y int) bool {
 func HandleMove(PlayerX int, PlayerY int, dArray []string) (int, int) {
 	tmpX := PlayerX
 	tmpY := PlayerY
+	fmt.Println(PlayerX, PlayerY)
 	if strings.TrimSpace(string(dArray[1])) == "up" {
+		fmt.Println("up")
 		tmpY = tmpY + 1
 	}
 	if strings.TrimSpace(string(dArray[1])) == "down" {
+		fmt.Println("down")
 		tmpY = tmpY - 1
 	}
 	if strings.TrimSpace(string(dArray[1])) == "left" {
+		fmt.Println("left")
 		tmpX = tmpX - 1
 	}
 	if strings.TrimSpace(string(dArray[1])) == "right" {
+		fmt.Println("right")
 		tmpX = tmpX + 1
 	}
 	blocked := checkIfBlock(tmpX, tmpY)
@@ -112,7 +132,59 @@ func HandleMove(PlayerX int, PlayerY int, dArray []string) (int, int) {
 		tmpX = PlayerX
 		tmpY = PlayerY
 	}
+	fmt.Println(PlayerX, PlayerY)
 	return tmpX, tmpY
+}
+
+func displayAnimation(name string, duration int) {
+	for key, currentPlayer := range playerList {
+		if getObjectDistance <= playerList[key] {
+			currentPlayer.visibleActions = append(playerList[key].visibleActions, action{ name: name, duration: duration })			
+			playerList[key] = currentPlayer
+		}
+	}
+}
+
+func handleActions(connId string, dArray []string) string {
+
+	response := "[ { "
+	currentPlayer := playerList[connId]
+
+	if strings.TrimSpace(string(dArray[0])) == "exit" {
+        	fmt.Println("Exiting game server!")
+        }
+	if strings.TrimSpace(string(dArray[0])) == "echo" {
+		response = response + " { " + strings.TrimSpace(string(dArray[1])) 
+        }
+	if strings.TrimSpace(string(dArray[0])) == "health" {
+		response = (strconv.Itoa(currentPlayer.health))
+	}
+	if strings.TrimSpace(string(dArray[0])) == "sethealth" {
+		var err error
+		currentPlayer.health, err = strconv.Atoi(strings.TrimSpace(string(dArray[1])))
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
+	if strings.TrimSpace(string(dArray[0])) == "animate" {
+		displayAnimation( connId, "exampleAnimation", 40)	
+	}
+	if strings.TrimSpace(string(dArray[0])) == "move" {
+		currentPlayer.x, currentPlayer.y = HandleMove(currentPlayer.x, currentPlayer.y, dArray)
+		playerList[connId] = currentPlayer
+		fmt.Println("PlayerX:", currentPlayer.x, "PlayerY:", currentPlayer.y)
+		fmt.Println("listX:", playerList[connId].x, "listY", playerList[connId].y)
+
+		response = response + `"x": ` + strconv.Itoa(currentPlayer.x) + `, "y": ` + strconv.Itoa(currentPlayer.y)
+	}
+
+	response = response + " } ] "
+
+	return response
+}
+
+func getActions(playerId string) string {
+return ""
 }
 
 func updateClient(playerId string) string {
@@ -123,6 +195,7 @@ func updateClient(playerId string) string {
 		tempMessage = ""
 		for x := currentBlock.x; x <= currentBlock.x + currentBlock.width; x++ {
 			for y := currentBlock.y; y <= currentBlock.y + currentBlock.height; y++ {
+				//Make this into a function.
 				distanceX := getDifference(playerList[playerId].x, x)
 				distanceY := getDifference(playerList[playerId].y, y)
 				lineDistance := int(math.Sqrt(math.Pow(float64(distanceX), 2) + math.Pow(float64(distanceY), 2)))
@@ -131,14 +204,10 @@ func updateClient(playerId string) string {
 						tempMessage = tempMessage + ", "
 					}
 					tempMessage = tempMessage + `{"x": ` + strconv.Itoa(x) + `, "y": ` + strconv.Itoa(y) + `}`
-					// It seems like the only way to make this work is to either create a queue for blocks that are visible that need to be sent, !!!or to add the , to the previous part, and not add it if it is the first one! 
-					//if y != currentBlock.y + currentBlock.height {
-					//}
 				}
 			}
 		}
 		if tempMessage != "" {
-			// Each block needs to be surrounded by curly brackets, within square, eg [{x 5 y 6}, {x 6 y 7}]
 			message = message + ` { "id": "` + key + ` ", "blockType": "` + currentBlock.blockType  + `", "x": ` + strconv.Itoa(currentBlock.x) + `, "y": ` + strconv.Itoa(currentBlock.y) + `, "width": ` + strconv.Itoa(currentBlock.width) + `, "height": ` + strconv.Itoa(currentBlock.height) + `, ` + `"blocks": [ ` + tempMessage + ` ] }`
 			if i != len(blockList) - 1 {
 				message = message + ", "
@@ -146,50 +215,42 @@ func updateClient(playerId string) string {
 		}
 		i = i + 1
 	}
-	message = message + " ]"
+	message = message + "]"
 	return message
 }
 
+
 func handleConnections(connId string) {
+
 	var message string
+
+	var response string
+	var renderUpdates string
+
 	playerList[connId] = player{health: 20, x: 0, y: 1, renderDistance: 3}
-	currentPlayer := playerList[connId]
+	
+//Send opening information to the player.
+
         for {
+		//Get what the player wants to do and then send a response.
 		message = ""
+
+		response = ""
+		renderUpdates = ""
+
                 data, err := bufio.NewReader(connList[connId]).ReadString('\n')
                 if err != nil {
                         fmt.Println(err)
                         return
                 }
 		dArray := strings.Split(data, " ")
-		if strings.TrimSpace(string(dArray[0])) == "exit" {
-                        fmt.Println("Exiting game server!")
-                        return
-                }
-		if strings.TrimSpace(string(dArray[0])) == "echo" {
-			message = strings.TrimSpace(string(dArray[1]))
-                }
-		if strings.TrimSpace(string(dArray[0])) == "health" {
-			message = (strconv.Itoa(currentPlayer.health))
-                }
-		if strings.TrimSpace(string(dArray[0])) == "sethealth" {
-			var err error
-			currentPlayer.health, err = strconv.Atoi(strings.TrimSpace(string(dArray[1])))
-			if err != nil {
-				fmt.Println(err)
-			}
-		}
-		if strings.TrimSpace(string(dArray[0])) == "move" {
-			currentPlayer.x, currentPlayer.y = HandleMove(currentPlayer.x, currentPlayer.y, dArray)
-			fmt.Println("PlayerX:", currentPlayer.x, "PlayerY:", currentPlayer.y)
-		}
-		if strings.TrimSpace(string(dArray[0])) == "update" {
-			message = updateClient(connId)
-                }
-		
-		playerList[connId] = currentPlayer
+		response = handleActions(connId, dArray)
 
-		message = message + "\n"
+		actions := getActions(connId)
+
+		renderUpdates = updateClient(connId)
+		
+		message = response + actions + renderUpdates + "\n"
                 connList[connId].Write([]byte(message))
         }
 }
@@ -217,8 +278,8 @@ func gameLoop() {
 }
 
 func main() {
-	blockList[genUUID()] = block{ blockType: "basic", x: 4, y: 4, height: 1, width: 1}
-	blockList[genUUID()] = block{ blockType: "flicker", x: 6, y: 4, height: 1, width: 0}
+	blockList[genUUID()] = block{ blockType: "basic", x: 4, y: 4, height: 0, width: 0}
+//	blockList[genUUID()] = block{ blockType: "flicker", x: 6, y: 4, height: 1, width: 0}
         PORT := ":9876"
         dstream, err := net.Listen("tcp", PORT)
         if err != nil {
