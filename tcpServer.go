@@ -148,17 +148,18 @@ func HandleMove(PlayerX float64, PlayerY float64, dArray []string) (float64, flo
 	return tmpX, tmpY
 }
 
-func getObjectDistance(x float64, y float64) {
-	distanceX := getDifferenceFloat64(playerList[playerId].x, x)
-	distanceY := getDifferenceFloat64(playerList[playerId].y, y)
-	lineDistance := math.Sqrt(math.Pow(float64(distanceX), 2) + math.Pow(float64(distanceY), 2))
+func getObjectDistance(startingX float64, startingY float64, x float64, y float64) float64 {
+	distanceX := getDifferenceFloat64(startingX, x)
+	distanceY := getDifferenceFloat64(startingY, y)
+	distance := math.Sqrt(math.Pow(float64(distanceX), 2) + math.Pow(float64(distanceY), 2))
+	return distance
 
 }
 
 func displayAnimation(key string, name string, x float64, y float64, duration int) {
-	for key, currentPlayer := range playerList {
-		if getObjectDistance <= playerList[key].renderDistance {
-			currentPlayer.visibleActions = append(playerList[key].visibleActions, action{ name: name, duration: duration })			
+	for _, currentPlayer := range playerList {
+		if getObjectDistance(x, y, currentPlayer.x, currentPlayer.y) <= playerList[key].renderDistance {
+			currentPlayer.visibleActions = append(playerList[key].visibleActions, action{ name: name, duration: duration })
 			playerList[key] = currentPlayer
 		}
 	}
@@ -186,7 +187,7 @@ func handleActions(connId string, dArray []string) string {
 		}
 	}
 	if strings.TrimSpace(string(dArray[0])) == "animate" {
-		displayAnimation( connId, "exampleAnimation", 40)	
+		displayAnimation( connId, "exampleAnimation", 5, 3, 50)
 	}
 	if strings.TrimSpace(string(dArray[0])) == "move" {
 		currentPlayer.x, currentPlayer.y = HandleMove(currentPlayer.x, currentPlayer.y, dArray)
@@ -223,6 +224,9 @@ func updateClient(playerId string) string {
 					}
 					tempMessage = tempMessage + `{"x": ` + strconv.Itoa(int(x)) + `, "y": ` + strconv.Itoa(int(y)) + `}`
 					// It seems like the only way to make this work is to either create a queue for blocks that are visible that need to be sent, !!!or to add the , to the previous part, and not add it if it is the first one! 
+					//After reading this comment from long ago, I think I will simply make it so the program checks every coardinate in a block, and if it is visible, it checks if the block with the same uuid has already been shown. If so, it doesn't add anything.
+					//I will also change how blocks work, making it so each block has a starting coardinate set, and an ending one, otherwise it will cause rendering issues.
+					//An alternative is to change the width and height as you send it to the client, depending on what is visible, but I think that introduces unnessacary complexity, and restricts the client unessircatly.
 					//if y != currentBlock.y + currentBlock.height {
 					//}
 				}
@@ -300,7 +304,7 @@ func gameLoop() {
 }
 
 func main() {
-	blockList[genUUID()] = block{ blockType: "basic", x: 4, y: 4, height: 0, width: 0}
+	blockList[genUUID()] = block{ blockType: "basic", x: 4, y: 4, height: 3, width: 3}
 //	blockList[genUUID()] = block{ blockType: "flicker", x: 6, y: 4, height: 1, width: 0}
         PORT := ":9876"
         dstream, err := net.Listen("tcp", PORT)
@@ -318,7 +322,6 @@ func main() {
 		} else {
 			connId := genUUID()
 			connList[connId] = conn
-			
 			go handleConnections(connId)
 		}
 	}
