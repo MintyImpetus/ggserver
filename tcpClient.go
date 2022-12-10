@@ -30,9 +30,16 @@ func main() {
 
                 message, _ := bufio.NewReader(c).ReadString('\n')
                 fmt.Print("->: " + message)
-                if strings.TrimSpace(string(text)) == "STOP" {
-                        fmt.Println("TCP client exiting...")
-                        return
+                if strings.TrimSpace(string(text)) == "exit" {
+			message, _ := bufio.NewReader(c).ReadString('\n')
+			fmt.Print("->: " + message)
+			if message == `[ { "exit": "successful" } ] []` { //Change this later to parse the json and find the result of the thing
+                        	fmt.Println("TCP client exiting...")
+				os.Exit(0)
+			} else {
+				fmt.Println("Error found.")
+				os.Exit(1)
+			}
                 }
         }
 }
